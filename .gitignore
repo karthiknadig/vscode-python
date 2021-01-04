@@ -39,5 +39,10 @@ build/ci/performance/performance-results.json
 debug*.log
 debugpy*.log
 pydevd*.log
+stryker*.log
 nodeLanguageServer/**
 nodeLanguageServer.*/**
+
+# stryker temp files
+.stryker-tmp
+reports/
