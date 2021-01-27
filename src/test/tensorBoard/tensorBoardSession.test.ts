@@ -1,5 +1,6 @@
 import { assert } from 'chai';
 import Sinon, * as sinon from 'sinon';
+import { SemVer } from 'semver';
 import { IApplicationShell, ICommandManager } from '../../client/common/application/types';
 import { IExperimentService, IInstaller, InstallerResponse, ProductInstallStatus } from '../../client/common/types';
 import { TensorBoard } from '../../client/common/utils/localize';
@@ -11,7 +12,6 @@ import { closeActiveWindows, initialize } from '../initialize';
 import * as ExperimentHelpers from '../../client/common/experiments/helpers';
 import { DiscoveryVariants } from '../../client/common/experiments/groups';
 import { IInterpreterService } from '../../client/interpreter/contracts';
-import { SemVer } from 'semver';
 import { Architecture } from '../../client/common/utils/platform';
 import { PythonEnvironment, EnvironmentType } from '../../client/pythonEnvironments/info';
 import { PYTHON_PATH } from '../common';
