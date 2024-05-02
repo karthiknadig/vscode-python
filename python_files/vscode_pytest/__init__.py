@@ -7,16 +7,9 @@ import os
 import pathlib
 import sys
 import traceback
-
+from typing import Any, Dict, List, Optional, Union, TypedDict, Literal
 
 import pytest
-
-script_dir = pathlib.Path(__file__).parent.parent
-sys.path.append(os.fspath(script_dir))
-sys.path.append(os.fspath(script_dir / "lib" / "python"))
-
-from testing_tools import socket_manager  # noqa: E402
-from typing import Any, Dict, List, Optional, Union, TypedDict, Literal  # noqa: E402
 
 
 class TestData(TypedDict):
@@ -849,8 +842,7 @@ def send_post_request(
 
     if __writer is None:
         try:
-            __writer = socket_manager.PipeManager(TEST_RUN_PIPE)
-            __writer.connect()
+            __writer = open(TEST_RUN_PIPE, "w", encoding="utf-8", newline="\r\n")
         except Exception as error:
             error_msg = f"Error attempting to connect to extension named pipe {TEST_RUN_PIPE}[vscode-pytest]: {error}"
             print(error_msg, file=sys.stderr)
@@ -867,11 +859,20 @@ def send_post_request(
         "jsonrpc": "2.0",
         "params": payload,
     }
-    data = json.dumps(rpc, cls=cls_encoder)
+    data = json.dumps(rpc, cls=cls_encoder, ensure_ascii=False)
 
     try:
         if __writer:
-            __writer.write(data)
+            __writer.write(
+                "\n".join(
+                    [
+                        f"Content-Length: {len(data)}",
+                        "",
+                        data,
+                    ]
+                )
+            )
+            __writer.flush()
         else:
             print(
                 f"Plugin error connection error[vscode-pytest], writer is None \n[vscode-pytest] data: \n{data} \n",

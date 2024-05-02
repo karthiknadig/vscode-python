@@ -3,7 +3,6 @@
 import json
 import os
 import pathlib
-import socket
 import sys
 import sysconfig
 import pytest
@@ -16,9 +15,7 @@ os.environ[path_var_name] = (
 
 script_dir = pathlib.Path(__file__).parent.parent
 sys.path.append(os.fspath(script_dir))
-sys.path.append(os.fspath(script_dir / "lib" / "python"))
 from testing_tools import process_json_util  # noqa: E402
-from testing_tools import socket_manager  # noqa: E402
 
 
 # This script handles running pytest via pytest.main(). It is called via run in the
@@ -35,35 +32,26 @@ if __name__ == "__main__":
     run_test_ids_pipe = os.environ.get("RUN_TEST_IDS_PIPE")
     if not run_test_ids_pipe:
         print("Error[vscode-pytest]: RUN_TEST_IDS_PIPE env var is not set.")
+
     raw_json = {}
     try:
-        socket_name = os.environ.get("RUN_TEST_IDS_PIPE")
-        with socket_manager.PipeManager(socket_name) as sock:
-            buffer = ""
-            while True:
-                # Receive the data from the client as a string
-                data = sock.read(3000)
-                if not data:
-                    break
+        pipe_name = os.environ.get("RUN_TEST_IDS_PIPE")
+        with open(pipe_name, "r", encoding="utf-8") as pipe:
+            try:
+                # Try to parse the buffer as JSON
+                raw_json = process_json_util.process_rpc_json(pipe.read())
+                # Clear the buffer as complete JSON object is received
+                buffer = ""
+                print("Received JSON data in run script")
+            except json.JSONDecodeError:
+                # JSON decoding error, the complete JSON object is not yet received
+                pass
+            except UnicodeDecodeError as e:
+                print(f"Error: Could process run test ids: {e}")
 
-                # Append the received data to the buffer
-                buffer += data
+    except OSError as e:
+        print(f"Error: Could not connect to runTestIdsPipe: {e}")
 
-                try:
-                    # Try to parse the buffer as JSON
-                    raw_json = process_json_util.process_rpc_json(buffer)
-                    # Clear the buffer as complete JSON object is received
-                    buffer = ""
-                    print("Received JSON data in run script")
-                    break
-                except json.JSONDecodeError:
-                    # JSON decoding error, the complete JSON object is not yet received
-                    continue
-                except UnicodeDecodeError:
-                    continue
-    except socket.error as e:
-        print(f"Error: Could not connect to runTestIdsPort: {e}")
-        print("Error: Could not connect to runTestIdsPort")
     try:
         test_ids_from_buffer = raw_json.get("params")
         if test_ids_from_buffer:
