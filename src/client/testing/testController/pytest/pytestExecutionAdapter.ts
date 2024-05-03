@@ -5,7 +5,7 @@ import { TestRun, Uri } from 'vscode';
 import * as path from 'path';
 import { ChildProcess } from 'child_process';
 import { IConfigurationService, ITestOutputChannel } from '../../../common/types';
-import { Deferred } from '../../../common/utils/async';
+import { Deferred, createDeferred } from '../../../common/utils/async';
 import { traceError, traceInfo, traceVerbose } from '../../../logging';
 import { EOTTestPayload, ExecutionTestPayload, ITestExecutionAdapter, ITestResultResolver } from '../common/types';
 import {
@@ -19,6 +19,7 @@ import { PYTEST_PROVIDER } from '../../common/constants';
 import { EXTENSION_ROOT_DIR } from '../../../common/constants';
 import * as utils from '../common/utils';
 import { IEnvironmentVariablesProvider } from '../../../common/variables/types';
+import { generateRandomPipeName } from '../../../common/pipes/namedPipes';
 
 export class PytestTestExecutionAdapter implements ITestExecutionAdapter {
     constructor(
@@ -37,8 +38,8 @@ export class PytestTestExecutionAdapter implements ITestExecutionAdapter {
         debugLauncher?: ITestDebugLauncher,
     ): Promise<ExecutionTestPayload> {
         // deferredTillEOT awaits EOT message and deferredTillServerClose awaits named pipe server close
-        const deferredTillEOT: Deferred<void> = utils.createTestingDeferred();
-        const deferredTillServerClose: Deferred<void> = utils.createTestingDeferred();
+        const deferredTillEOT: Deferred<void> = createDeferred();
+        const deferredTillServerClose: Deferred<void> = createDeferred();
 
         // create callback to handle data received on the named pipe
         const dataReceivedCallback = (data: ExecutionTestPayload | EOTTestPayload) => {
@@ -48,7 +49,10 @@ export class PytestTestExecutionAdapter implements ITestExecutionAdapter {
                 traceError(`No run instance found, cannot resolve execution, for workspace ${uri.fsPath}.`);
             }
         };
-        const { name, dispose: serverDispose } = await utils.startRunResultNamedPipe(
+
+        const resultPipeName = generateRandomPipeName('python-test-results');
+        const serverDispose = await utils.startRunResultNamedPipe(
+            resultPipeName,
             dataReceivedCallback, // callback to handle data received
             deferredTillServerClose, // deferred to resolve when server closes
             runInstance?.token, // token to cancel
@@ -71,7 +75,7 @@ export class PytestTestExecutionAdapter implements ITestExecutionAdapter {
             await this.runTestsNew(
                 uri,
                 testIds,
-                name,
+                resultPipeName,
                 deferredTillEOT,
                 serverDispose,
                 runInstance,
@@ -143,7 +147,8 @@ export class PytestTestExecutionAdapter implements ITestExecutionAdapter {
             }
 
             // add port with run test ids to env vars
-            const testIdsPipeName = await utils.startTestIdsNamedPipe(testIds);
+            const testIdsPipeName = generateRandomPipeName('python-test-ids');
+            await utils.startTestIdsNamedPipe(testIdsPipeName, testIds, runInstance?.token);
             mutableEnv.RUN_TEST_IDS_PIPE = testIdsPipeName;
             traceInfo(`All environment variables set for pytest execution: ${JSON.stringify(mutableEnv)}`);
 
@@ -172,7 +177,7 @@ export class PytestTestExecutionAdapter implements ITestExecutionAdapter {
                 });
             } else {
                 // deferredTillExecClose is resolved when all stdout and stderr is read
-                const deferredTillExecClose: Deferred<void> = utils.createTestingDeferred();
+                const deferredTillExecClose: Deferred<void> = createDeferred();
                 // combine path to run script with run args
                 const scriptPath = path.join(fullPluginPath, 'vscode_pytest', 'run_pytest_script.py');
                 const runArgs = [scriptPath, ...testArgs];

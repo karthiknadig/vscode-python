@@ -17,7 +17,6 @@ import {
     MESSAGE_ON_TESTING_OUTPUT_MOVE,
     createDiscoveryErrorPayload,
     createEOTPayload,
-    createTestingDeferred,
     fixLogLinesNoTrailing,
     startDiscoveryNamedPipe,
     addValueIfKeyNotExist,
@@ -112,7 +111,7 @@ export class PytestTestDiscoveryAdapter implements ITestDiscoveryAdapter {
         const execArgs = ['-m', 'pytest', '-p', 'vscode_pytest', '--collect-only'].concat(pytestArgs);
         traceVerbose(`Running pytest discovery with command: ${execArgs.join(' ')} for workspace ${uri.fsPath}.`);
 
-        const deferredTillExecClose: Deferred<void> = createTestingDeferred();
+        const deferredTillExecClose: Deferred<void> = createDeferred();
         const result = execService?.execObservable(execArgs, spawnOptions);
 
         // Take all output from the subprocess and add it to the test output channel. This will be the pytest output.

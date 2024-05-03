@@ -8,7 +8,7 @@ import * as path from 'path';
 import { Observable } from 'rxjs';
 import { IPythonExecutionFactory, IPythonExecutionService, Output } from '../../../client/common/process/types';
 import { IConfigurationService, ITestOutputChannel } from '../../../client/common/types';
-import { Deferred, createDeferred } from '../../../client/common/utils/async';
+import * as asyncUtil from '../../../client/common/utils/async';
 import { EXTENSION_ROOT_DIR } from '../../../client/constants';
 import { ITestDebugLauncher } from '../../../client/testing/common/types';
 import { PytestTestExecutionAdapter } from '../../../client/testing/testController/pytest/pytestExecutionAdapter';
@@ -23,7 +23,6 @@ suite('Execution Flow Run Adapters', () => {
     let configService: IConfigurationService;
     let execFactoryStub = typeMoq.Mock.ofType<IPythonExecutionFactory>();
     let execServiceStub: typeMoq.IMock<IPythonExecutionService>;
-    // let deferred: Deferred<void>;
     let debugLauncher: typeMoq.IMock<ITestDebugLauncher>;
     (global as any).EXTENSION_ROOT_DIR = EXTENSION_ROOT_DIR;
     let myTestPath: string;
@@ -86,14 +85,14 @@ suite('Execution Flow Run Adapters', () => {
             execServiceStub.setup((p) => ((p as unknown) as any).then).returns(() => undefined);
 
             // test ids named pipe mocking
-            const deferredStartTestIdsNamedPipe = createDeferred();
+            const deferredStartTestIdsNamedPipe = asyncUtil.createDeferred();
             utilsStartTestIdsNamedPipe.callsFake(() => {
                 deferredStartTestIdsNamedPipe.resolve();
                 return Promise.resolve('named-pipe');
             });
 
             // run result pipe mocking and the related server close dispose
-            let deferredTillServerCloseTester: Deferred<void> | undefined;
+            let deferredTillServerCloseTester: asyncUtil.Deferred<void> | undefined;
             utilsStartRunResultNamedPipe.callsFake((_callback, deferredTillServerClose, _token) => {
                 deferredTillServerCloseTester = deferredTillServerClose;
                 return Promise.resolve({ name: 'named-pipes-socket-name', dispose: serverDisposeStub });
@@ -111,9 +110,9 @@ suite('Execution Flow Run Adapters', () => {
             });
 
             // mock EOT token & ExecClose token
-            const deferredEOT = createDeferred();
-            const deferredExecClose = createDeferred();
-            const utilsCreateEOTStub: sinon.SinonStub = sinon.stub(util, 'createTestingDeferred');
+            const deferredEOT = asyncUtil.createDeferred();
+            const deferredExecClose = asyncUtil.createDeferred();
+            const utilsCreateEOTStub: sinon.SinonStub = sinon.stub(asyncUtil, 'createDeferred');
             utilsCreateEOTStub.callsFake(() => {
                 if (utilsCreateEOTStub.callCount === 1) {
                     return deferredEOT;
@@ -164,14 +163,14 @@ suite('Execution Flow Run Adapters', () => {
             execServiceStub.setup((p) => ((p as unknown) as any).then).returns(() => undefined);
 
             // test ids named pipe mocking
-            const deferredStartTestIdsNamedPipe = createDeferred();
+            const deferredStartTestIdsNamedPipe = asyncUtil.createDeferred();
             utilsStartTestIdsNamedPipe.callsFake(() => {
                 deferredStartTestIdsNamedPipe.resolve();
                 return Promise.resolve('named-pipe');
             });
 
             // run result pipe mocking and the related server close dispose
-            let deferredTillServerCloseTester: Deferred<void> | undefined;
+            let deferredTillServerCloseTester: asyncUtil.Deferred<void> | undefined;
             utilsStartRunResultNamedPipe.callsFake((_callback, deferredTillServerClose, _token) => {
                 deferredTillServerCloseTester = deferredTillServerClose;
                 return Promise.resolve({
@@ -192,9 +191,9 @@ suite('Execution Flow Run Adapters', () => {
             });
 
             // mock EOT token & ExecClose token
-            const deferredEOT = createDeferred();
-            const deferredExecClose = createDeferred();
-            const utilsCreateEOTStub: sinon.SinonStub = sinon.stub(util, 'createTestingDeferred');
+            const deferredEOT = asyncUtil.createDeferred();
+            const deferredExecClose = asyncUtil.createDeferred();
+            const utilsCreateEOTStub: sinon.SinonStub = sinon.stub(asyncUtil, 'createDeferred');
             utilsCreateEOTStub.callsFake(() => {
                 if (utilsCreateEOTStub.callCount === 1) {
                     return deferredEOT;

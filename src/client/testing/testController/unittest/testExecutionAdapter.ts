@@ -16,7 +16,14 @@ import {
     TestExecutionCommand,
 } from '../common/types';
 import { traceError, traceInfo, traceLog } from '../../../logging';
-import { MESSAGE_ON_TESTING_OUTPUT_MOVE, fixLogLinesNoTrailing } from '../common/utils';
+import {
+    MESSAGE_ON_TESTING_OUTPUT_MOVE,
+    createEOTPayload,
+    createExecutionErrorPayload,
+    fixLogLinesNoTrailing,
+    startRunResultNamedPipe,
+    startTestIdsNamedPipe,
+} from '../common/utils';
 import { EnvironmentVariables, IEnvironmentVariablesProvider } from '../../../common/variables/types';
 import {
     ExecutionFactoryCreateWithEnvironmentOptions,
@@ -26,7 +33,7 @@ import {
 } from '../../../common/process/types';
 import { ITestDebugLauncher, LaunchOptions } from '../../common/types';
 import { UNITTEST_PROVIDER } from '../../common/constants';
-import * as utils from '../common/utils';
+import { generateRandomPipeName } from '../../../common/pipes/namedPipes';
 
 /**
  * Wrapper Class for unittest test execution. This is where we call `runTestCommand`?
@@ -49,8 +56,8 @@ export class UnittestTestExecutionAdapter implements ITestExecutionAdapter {
         debugLauncher?: ITestDebugLauncher,
     ): Promise<ExecutionTestPayload> {
         // deferredTillEOT awaits EOT message and deferredTillServerClose awaits named pipe server close
-        const deferredTillEOT: Deferred<void> = utils.createTestingDeferred();
-        const deferredTillServerClose: Deferred<void> = utils.createTestingDeferred();
+        const deferredTillEOT: Deferred<void> = createDeferred<void>();
+        const deferredTillServerClose: Deferred<void> = createDeferred<void>();
 
         // create callback to handle data received on the named pipe
         const dataReceivedCallback = (data: ExecutionTestPayload | EOTTestPayload) => {
@@ -60,7 +67,7 @@ export class UnittestTestExecutionAdapter implements ITestExecutionAdapter {
                 traceError(`No run instance found, cannot resolve execution, for workspace ${uri.fsPath}.`);
             }
         };
-        const { name: resultNamedPipeName, dispose: serverDispose } = await utils.startRunResultNamedPipe(
+        const { name: resultNamedPipeName, dispose: serverDispose } = await startRunResultNamedPipe(
             dataReceivedCallback, // callback to handle data received
             deferredTillServerClose, // deferred to resolve when server closes
             runInstance?.token, // token to cancel
@@ -137,7 +144,8 @@ export class UnittestTestExecutionAdapter implements ITestExecutionAdapter {
         traceLog(`Running UNITTEST execution for the following test ids: ${testIds}`);
 
         // create named pipe server to send test ids
-        const testIdsPipeName = await utils.startTestIdsNamedPipe(testIds);
+        const testIdsPipeName = generateRandomPipeName('python-test-ids');
+        await startTestIdsNamedPipe(testIdsPipeName, testIds, runInstance?.token);
         mutableEnv.RUN_TEST_IDS_PIPE = testIdsPipeName;
         traceInfo(`All environment variables set for pytest execution: ${JSON.stringify(mutableEnv)}`);
 
@@ -227,15 +235,11 @@ export class UnittestTestExecutionAdapter implements ITestExecutionAdapter {
                         );
                         if (runInstance) {
                             this.resultResolver?.resolveExecution(
-                                utils.createExecutionErrorPayload(code, signal, testIds, cwd),
+                                createExecutionErrorPayload(code, signal, testIds, cwd),
                                 runInstance,
                                 deferredTillEOT,
                             );
-                            this.resultResolver?.resolveExecution(
-                                utils.createEOTPayload(true),
-                                runInstance,
-                                deferredTillEOT,
-                            );
+                            this.resultResolver?.resolveExecution(createEOTPayload(true), runInstance, deferredTillEOT);
                         }
                         serverDispose();
                     }

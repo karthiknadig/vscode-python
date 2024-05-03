@@ -14,7 +14,7 @@ import {
     Output,
     SpawnOptions,
 } from '../../../../client/common/process/types';
-import { createDeferred, Deferred } from '../../../../client/common/utils/async';
+import * as asyncUtil from '../../../../client/common/utils/async';
 import { ITestDebugLauncher, LaunchOptions } from '../../../../client/testing/common/types';
 import * as util from '../../../../client/testing/testController/common/utils';
 import { EXTENSION_ROOT_DIR } from '../../../../client/constants';
@@ -27,8 +27,8 @@ suite('Unittest test execution adapter', () => {
     let execFactory = typeMoq.Mock.ofType<IPythonExecutionFactory>();
     let adapter: UnittestTestExecutionAdapter;
     let execService: typeMoq.IMock<IPythonExecutionService>;
-    let deferred: Deferred<void>;
-    let deferred4: Deferred<void>;
+    let deferred: asyncUtil.Deferred<void>;
+    let deferred4: asyncUtil.Deferred<void>;
     let debugLauncher: typeMoq.IMock<ITestDebugLauncher>;
     (global as any).EXTENSION_ROOT_DIR = EXTENSION_ROOT_DIR;
     let myTestPath: string;
@@ -48,7 +48,7 @@ suite('Unittest test execution adapter', () => {
         const output = new Observable<Output<string>>(() => {
             /* no op */
         });
-        deferred4 = createDeferred();
+        deferred4 = asyncUtil.createDeferred();
         execService = typeMoq.Mock.ofType<IPythonExecutionService>();
         execService
             .setup((x) => x.execObservable(typeMoq.It.isAny(), typeMoq.It.isAny()))
@@ -70,7 +70,7 @@ suite('Unittest test execution adapter', () => {
         execFactory
             .setup((x) => x.createActivatedEnvironment(typeMoq.It.isAny()))
             .returns(() => Promise.resolve(execService.object));
-        deferred = createDeferred();
+        deferred = asyncUtil.createDeferred();
         execService
             .setup((x) => x.exec(typeMoq.It.isAny(), typeMoq.It.isAny()))
             .returns(() => {
@@ -96,8 +96,8 @@ suite('Unittest test execution adapter', () => {
         sinon.restore();
     });
     test('startTestIdServer called with correct testIds', async () => {
-        const deferred2 = createDeferred();
-        const deferred3 = createDeferred();
+        const deferred2 = asyncUtil.createDeferred();
+        const deferred3 = asyncUtil.createDeferred();
         execFactory = typeMoq.Mock.ofType<IPythonExecutionFactory>();
         execFactory
             .setup((x) => x.createActivatedEnvironment(typeMoq.It.isAny()))
@@ -132,8 +132,8 @@ suite('Unittest test execution adapter', () => {
         sinon.assert.calledWithExactly(utilsStartTestIdsNamedPipeStub, testIds);
     });
     test('unittest execution called with correct args', async () => {
-        const deferred2 = createDeferred();
-        const deferred3 = createDeferred();
+        const deferred2 = asyncUtil.createDeferred();
+        const deferred3 = asyncUtil.createDeferred();
         execFactory = typeMoq.Mock.ofType<IPythonExecutionFactory>();
         execFactory
             .setup((x) => x.createActivatedEnvironment(typeMoq.It.isAny()))
@@ -182,8 +182,8 @@ suite('Unittest test execution adapter', () => {
         );
     });
     test('unittest execution respects settings.testing.cwd when present', async () => {
-        const deferred2 = createDeferred();
-        const deferred3 = createDeferred();
+        const deferred2 = asyncUtil.createDeferred();
+        const deferred3 = asyncUtil.createDeferred();
         execFactory = typeMoq.Mock.ofType<IPythonExecutionFactory>();
         execFactory
             .setup((x) => x.createActivatedEnvironment(typeMoq.It.isAny()))
@@ -240,8 +240,8 @@ suite('Unittest test execution adapter', () => {
         );
     });
     test('Debug launched correctly for unittest', async () => {
-        const deferred3 = createDeferred();
-        const deferredEOT = createDeferred();
+        const deferred3 = asyncUtil.createDeferred();
+        const deferredEOT = asyncUtil.createDeferred();
         utilsStartTestIdsNamedPipeStub.callsFake(() => {
             deferred3.resolve();
             return Promise.resolve('testIdPipe-mockName');
@@ -252,7 +252,7 @@ suite('Unittest test execution adapter', () => {
                 traceInfo('stubs launch debugger');
                 deferredEOT.resolve();
             });
-        const utilsCreateEOTStub: sinon.SinonStub = sinon.stub(util, 'createTestingDeferred');
+        const utilsCreateEOTStub: sinon.SinonStub = sinon.stub(asyncUtil, 'createDeferred');
         utilsCreateEOTStub.callsFake(() => deferredEOT);
         const testRun = typeMoq.Mock.ofType<TestRun>();
         testRun
