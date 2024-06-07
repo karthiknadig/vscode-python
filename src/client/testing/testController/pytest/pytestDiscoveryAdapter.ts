@@ -36,28 +36,27 @@ export class PytestTestDiscoveryAdapter implements ITestDiscoveryAdapter {
     ) {}
 
     async discoverTests(uri: Uri, executionFactory?: IPythonExecutionFactory): Promise<DiscoveredTestPayload> {
-        const deferredTillEOT: Deferred<void> = createDeferred<void>();
+        const discoverDone: Deferred<void> = createDeferred<void>();
 
         const { name, dispose } = await startDiscoveryNamedPipe((data: DiscoveredTestPayload | EOTTestPayload) => {
-            this.resultResolver?.resolveDiscovery(data, deferredTillEOT);
+            this.resultResolver?.resolveDiscovery(data, discoverDone);
         });
 
         try {
-            await this.runPytestDiscovery(uri, name, deferredTillEOT, executionFactory);
+            await this.runPytestDiscovery(uri, name, discoverDone, executionFactory);
         } finally {
-            await deferredTillEOT.promise;
+            await discoverDone.promise;
             traceVerbose('deferredTill EOT resolved');
             dispose();
         }
         // this is only a placeholder to handle function overloading until rewrite is finished
-        const discoveryPayload: DiscoveredTestPayload = { cwd: uri.fsPath, status: 'success' };
-        return discoveryPayload;
+        return { cwd: uri.fsPath, status: 'success' };
     }
 
     async runPytestDiscovery(
         uri: Uri,
         discoveryPipeName: string,
-        deferredTillEOT: Deferred<void>,
+        discoverDone: Deferred<void>,
         executionFactory?: IPythonExecutionFactory,
     ): Promise<void> {
         const relativePathToPytest = 'python_files';
@@ -111,7 +110,7 @@ export class PytestTestDiscoveryAdapter implements ITestDiscoveryAdapter {
         const execArgs = ['-m', 'pytest', '-p', 'vscode_pytest', '--collect-only'].concat(pytestArgs);
         traceVerbose(`Running pytest discovery with command: ${execArgs.join(' ')} for workspace ${uri.fsPath}.`);
 
-        const deferredTillExecClose: Deferred<void> = createDeferred();
+        const exeClosed: Deferred<void> = createDeferred();
         const result = execService?.execObservable(execArgs, spawnOptions);
 
         // Take all output from the subprocess and add it to the test output channel. This will be the pytest output.
@@ -142,13 +141,13 @@ export class PytestTestDiscoveryAdapter implements ITestDiscoveryAdapter {
                 traceError(
                     `Subprocess exited unsuccessfully with exit code ${code} and signal ${signal} on workspace ${uri.fsPath}. Creating and sending error discovery payload`,
                 );
-                this.resultResolver?.resolveDiscovery(createDiscoveryErrorPayload(code, signal, cwd), deferredTillEOT);
-                this.resultResolver?.resolveDiscovery(createEOTPayload(false), deferredTillEOT);
+                this.resultResolver?.resolveDiscovery(createDiscoveryErrorPayload(code, signal, cwd), discoverDone);
+                this.resultResolver?.resolveDiscovery(createEOTPayload(false), discoverDone);
             }
             // deferredTillEOT is resolved when all data sent on stdout and stderr is received, close event is only called when this occurs
             // due to the sync reading of the output.
-            deferredTillExecClose?.resolve();
+            exeClosed?.resolve();
         });
-        await deferredTillExecClose.promise;
+        await exeClosed.promise;
     }
 }

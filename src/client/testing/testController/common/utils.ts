@@ -3,17 +3,8 @@
 import * as net from 'net';
 import * as path from 'path';
 import * as fs from 'fs';
-import {
-    CancellationToken,
-    Position,
-    TestController,
-    TestItem,
-    Uri,
-    Range,
-    Disposable,
-    CancellationError,
-} from 'vscode';
-import { Message } from 'vscode-jsonrpc';
+import { CancellationToken, Position, TestController, TestItem, Uri, Range, Disposable } from 'vscode';
+import { Message, NotificationMessage } from 'vscode-jsonrpc';
 import { traceError, traceInfo, traceLog, traceVerbose } from '../../../logging';
 import { EnableTestAdapterRewrite } from '../../../common/experiments/groups';
 import { IExperimentService } from '../../../common/types';
@@ -27,7 +18,7 @@ import {
     ExecutionTestPayload,
     ITestResultResolver,
 } from './types';
-import { Deferred, createDeferred } from '../../../common/utils/async';
+import { Deferred } from '../../../common/utils/async';
 import { createReaderPipe, createWriterPipe, generateRandomPipeName } from '../../../common/pipes/namedPipes';
 
 export function fixLogLines(content: string): string {
@@ -215,45 +206,52 @@ export async function startRunResultNamedPipe(
     return reader;
 }
 
-interface DiscoveryResultMessage extends Message {
-    params: DiscoveredTestPayload | EOTTestPayload;
-}
-
 export async function startDiscoveryNamedPipe(
     callback: (payload: DiscoveredTestPayload | EOTTestPayload) => void,
     cancellationToken?: CancellationToken,
 ): Promise<{ name: string } & Disposable> {
     traceVerbose('Starting Test Discovery named pipe');
     const pipeName: string = generateRandomPipeName('python-test-discovery');
-    let dispose: () => void = () => {
-        /* noop */
-    };
     const reader = await createReaderPipe(pipeName);
-    await createNamedPipeServer(pipeName, ([reader, _writer]) => {
-        traceVerbose(`Test Discovery named pipe ${pipeName} connected`);
-        let disposables: (Disposable | undefined)[] = [reader];
-        dispose = () => {
-            traceVerbose(`Test Discovery named pipe ${pipeName} disposed`);
-            disposables.forEach((d) => d?.dispose());
-            disposables = [];
-        };
+
+    reader.listen((data: Message) => {
+        traceVerbose(`Test Discovery named pipe ${pipeName} received data`);
+        callback((data as NotificationMessage).params as DiscoveredTestPayload | EOTTestPayload);
+    });
+    let disposables: Disposable[] = [reader];
+    if (cancellationToken) {
         disposables.push(
-            cancellationToken?.onCancellationRequested(() => {
-                traceVerbose(`Test Discovery named pipe ${pipeName}  cancelled`);
-                dispose();
-            }),
-            reader.listen((data: Message) => {
-                traceVerbose(`Test Discovery named pipe ${pipeName} received data`);
-                callback((data as DiscoveryResultMessage).params as DiscoveredTestPayload | EOTTestPayload);
-            }),
-            reader.onClose(() => {
-                callback(createEOTPayload(true));
-                traceVerbose(`Test Discovery named pipe ${pipeName} closed`);
-                dispose();
+            cancellationToken.onCancellationRequested(() => {
+                traceVerbose(`Test Discovery cancelled, disposing namedpipe ${pipeName}`);
+                disposables.forEach((d) => d.dispose());
+                disposables = [];
             }),
         );
-    });
-    return { name: pipeName, dispose };
+    }
+    disposables.push(
+        reader.listen((data: Message) => {
+            traceVerbose(`Test Discovery named pipe ${pipeName} received data`);
+            callback((data as NotificationMessage).params as DiscoveredTestPayload | EOTTestPayload);
+        }),
+        reader.onClose(() => {
+            traceVerbose(`Test Discovery named pipe ${pipeName} closed`);
+            disposables.forEach((d) => d.dispose());
+            disposables = [];
+        }),
+        reader.onError((error) => {
+            traceError(`Test Discovery named pipe ${pipeName} error`, error);
+            disposables.forEach((d) => d.dispose());
+            disposables = [];
+        }),
+    );
+
+    return {
+        name: pipeName,
+        dispose: () => {
+            disposables.forEach((d) => d.dispose());
+            disposables = [];
+        },
+    };
 }
 
 export async function startTestIdServer(testIds: string[]): Promise<number> {

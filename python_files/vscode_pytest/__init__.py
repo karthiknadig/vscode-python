@@ -855,8 +855,15 @@ def send_post_request(
             __writer = None
             raise VSCodePytestError(error_msg)
 
+    method = "eot"
+    if isinstance(payload, DiscoveryPayloadDict):
+        method = "discovery"
+    elif isinstance(payload, ExecutionPayloadDict):
+        method = "execution"
+
     rpc = {
         "jsonrpc": "2.0",
+        "method": method,
         "params": payload,
     }
     data = json.dumps(rpc, cls=cls_encoder, ensure_ascii=False)

@@ -85,9 +85,15 @@ class CombinedReader implements rpc.MessageReader {
 
     private _onPartialMessage = new rpc.Emitter<rpc.PartialMessageInfo>();
 
-    private _listeners: rpc.DataCallback[] = [];
+    private _listeners = new rpc.Emitter<rpc.NotificationMessage>();
 
     private _readers: rpc.MessageReader[] = [];
+
+    private _disposables: rpc.Disposable[] = [];
+
+    constructor() {
+        this._disposables.push(this._onClose, this._onError, this._onPartialMessage, this._listeners);
+    }
 
     onError: rpc.Event<Error> = this._onError.event;
 
@@ -96,22 +102,19 @@ class CombinedReader implements rpc.MessageReader {
     onPartialMessage: rpc.Event<rpc.PartialMessageInfo> = this._onPartialMessage.event;
 
     listen(callback: rpc.DataCallback): rpc.Disposable {
-        this._listeners.push(callback);
-        return {
-            dispose: () => {
-                this._listeners = this._listeners.filter((listener) => listener !== callback);
-            },
-        };
+        return this._listeners.event(callback);
     }
 
     add(reader: rpc.MessageReader): void {
         this._readers.push(reader);
-        reader.onError((error) => this._onError.fire(error));
-        reader.onClose(() => this.dispose());
-        reader.onPartialMessage((info) => this._onPartialMessage.fire(info));
-        reader.listen((msg) => {
-            this._listeners.forEach((listener) => listener(msg));
-        });
+        this._disposables.push(
+            reader.onError((error) => this._onError.fire(error)),
+            reader.onClose(() => this.dispose()),
+            reader.onPartialMessage((info) => this._onPartialMessage.fire(info)),
+            reader.listen((msg) => {
+                this._listeners.fire(msg as rpc.NotificationMessage);
+            }),
+        );
     }
 
     error(error: Error): void {
@@ -120,11 +123,13 @@ class CombinedReader implements rpc.MessageReader {
 
     dispose(): void {
         this._onClose.fire();
-        this._onClose.dispose();
-        this._onError.dispose();
-        this._onPartialMessage.dispose();
-        this._listeners = [];
-        this._readers.forEach((reader) => reader.dispose());
+        this._disposables.forEach((disposable) => {
+            try {
+                disposable.dispose();
+            } catch (e) {
+                /* noop */
+            }
+        });
     }
 }
 
@@ -139,9 +144,8 @@ export async function createReaderPipe(pipeName: string, token?: CancellationTok
 
             socket.on('close', () => {
                 refs -= 1;
-                if (refs === 0) {
+                if (refs <= 0) {
                     server.close();
-                    combined.dispose();
                 }
             });
             combined.add(new rpc.SocketMessageReader(socket, 'utf-8'));
