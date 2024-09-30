@@ -22,6 +22,8 @@ import {
     CreateEnvironmentCheckKind,
     triggerCreateEnvironmentCheckNonBlocking,
 } from '../../pythonEnvironments/creation/createEnvironmentTrigger';
+import { EnvsExtensionCommands } from '../../envsExt/commands';
+import { getPythonProject, getRunInTerminalOptions, isEnvsExtensionInstalled } from '../../envsExt/envsExtension';
 
 @injectable()
 export class CodeExecutionManager implements ICodeExecutionManager {
@@ -45,6 +47,17 @@ export class CodeExecutionManager implements ICodeExecutionManager {
                 this.disposableRegistry.push(
                     this.commandManager.registerCommand(cmd as any, async (file: Resource) => {
                         traceVerbose(`Attempting to run Python file`, file?.fsPath);
+
+                        if (file && isEnvsExtensionInstalled()) {
+                            this.commandManager
+                                .executeCommand(
+                                    EnvsExtensionCommands.RUN_IN_TERMINAL,
+                                    getRunInTerminalOptions(file, cmd === Commands.Exec_In_Separate_Terminal),
+                                )
+                                .then(noop, noop);
+                            return;
+                        }
+
                         const interpreterService = this.serviceContainer.get<IInterpreterService>(IInterpreterService);
                         const interpreter = await interpreterService.getActiveInterpreter(file);
                         if (!interpreter) {

@@ -55,6 +55,7 @@ import { StopWatch } from './common/utils/stopWatch';
 import { registerReplCommands, registerReplExecuteOnEnter, registerStartNativeReplCommand } from './repl/replCommands';
 import { registerTriggerForTerminalREPL } from './terminals/codeExecution/terminalReplWatcher';
 import { registerPythonStartup } from './terminals/pythonStartup';
+import { getEnvsApi } from './envsExt/envsExtension';
 
 export async function activateComponents(
     // `ext` is passed to any extra activation funcs.
@@ -167,6 +168,9 @@ async function activateLegacy(ext: ExtensionState, startupStopWatch: StopWatch):
         const interpreterManager = serviceContainer.get<IInterpreterService>(IInterpreterService);
         interpreterManager.initialize();
         if (!workspaceService.isVirtualWorkspace) {
+            setImmediate(async () => {
+                await getEnvsApi();
+            });
             const handlers = serviceManager.getAll<IDebugSessionEventHandlers>(IDebugSessionEventHandlers);
             const dispatcher = new DebugSessionEventDispatcher(handlers, DebugService.instance, disposables);
             dispatcher.registerEventHandlers();
