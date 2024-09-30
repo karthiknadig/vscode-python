@@ -39,7 +39,6 @@ import { initializeStandard, initializeComponents, initializeGlobals } from './e
 import { IServiceContainer } from './ioc/types';
 import { sendErrorTelemetry, sendStartupTelemetry } from './startupTelemetry';
 import { IStartupDurations } from './types';
-import { runAfterActivation } from './common/utils/runAfterActivation';
 import { IInterpreterService } from './interpreter/contracts';
 import { PythonExtension } from './api/types';
 import { WorkspaceService } from './common/application/workspace';
@@ -155,8 +154,6 @@ async function activateUnsafe(
                     .catch((ex) => traceError('Python Extension: interpreterManager.refresh', ex));
             }
         }
-
-        runAfterActivation();
     });
 
     const api = buildApi(

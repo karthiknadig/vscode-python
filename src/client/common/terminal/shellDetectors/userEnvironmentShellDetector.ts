@@ -61,9 +61,9 @@ function getDefaultShell(platform: IPlatformService, currentProcess: ICurrentPro
 }
 function getTerminalDefaultShellWindows(platform: IPlatformService, currentProcess: ICurrentProcess): string {
     const isAtLeastWindows10 = parseFloat(platform.osRelease) >= 10;
-    const is32ProcessOn64Windows = currentProcess.env.hasOwnProperty('PROCESSOR_ARCHITEW6432');
+    const isWoW64 = currentProcess.env.hasOwnProperty('PROCESSOR_ARCHITEW6432');
     const powerShellPath = `${currentProcess.env.windir}\\${
-        is32ProcessOn64Windows ? 'Sysnative' : 'System32'
+        isWoW64 ? 'Sysnative' : 'System32'
     }\\WindowsPowerShell\\v1.0\\powershell.exe`;
     return isAtLeastWindows10 ? powerShellPath : getWindowsShell(currentProcess);
 }
