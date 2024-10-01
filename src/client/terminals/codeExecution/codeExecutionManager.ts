@@ -23,7 +23,7 @@ import {
     triggerCreateEnvironmentCheckNonBlocking,
 } from '../../pythonEnvironments/creation/createEnvironmentTrigger';
 import { EnvsExtensionCommands } from '../../envsExt/commands';
-import { getPythonProject, getRunInTerminalOptions, isEnvsExtensionInstalled } from '../../envsExt/envsExtension';
+import { getRunInTerminalOptions, isEnvsExtensionInstalled } from '../../envsExt/envsExtension';
 
 @injectable()
 export class CodeExecutionManager implements ICodeExecutionManager {
