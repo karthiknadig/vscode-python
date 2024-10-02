@@ -8,7 +8,11 @@ import { Commands as LSCommands } from '../../activation/commands';
 import { TensorBoardEntrypoint, TensorBoardEntrypointTrigger } from '../../tensorBoard/constants';
 import { Channel, Commands, CommandSource } from '../constants';
 import { CreateEnvironmentOptions } from '../../pythonEnvironments/creation/proposed.createEnvApis';
-import { EnvsExtensionCommands, TerminalPythonExecutionOptions } from '../../envsExt/commands';
+import {
+    EnvsExtensionCommands,
+    PythonTaskExecutionOptions,
+    PythonTerminalExecutionOptions,
+} from '../../envsExt/commands';
 
 export type CommandsWithoutArgs = keyof ICommandNameWithoutArgumentTypeMapping;
 
@@ -116,5 +120,6 @@ export interface ICommandNameArgumentTypeMapping extends ICommandNameWithoutArgu
         },
     ];
     ['cursorEnd']: [];
-    [EnvsExtensionCommands.RUN_IN_TERMINAL]: [Uri | TerminalPythonExecutionOptions];
+    [EnvsExtensionCommands.RUN_IN_TERMINAL]: [Uri | PythonTerminalExecutionOptions];
+    [EnvsExtensionCommands.RUN_AS_TASK]: [PythonTaskExecutionOptions];
 }

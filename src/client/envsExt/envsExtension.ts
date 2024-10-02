@@ -1,7 +1,7 @@
 import { Uri } from 'vscode';
 import { getExtension } from '../common/vscodeApis/extensionsApi';
 import { PythonEnvironmentApi, PythonProject } from './types';
-import { TerminalPythonExecutionOptions } from './commands';
+import { PythonTaskExecutionOptions, PythonTerminalExecutionOptions } from './commands';
 
 export const ENVS_EXTENSION_ID = 'ms-python.vscode-python-envs';
 
@@ -36,7 +36,7 @@ export function getPythonProject(uri: Uri): PythonProject | undefined {
     return api?.getPythonProject(uri);
 }
 
-export function getRunInTerminalOptions(uri: Uri, useDedicated: boolean): Uri | TerminalPythonExecutionOptions {
+export function getRunInTerminalOptions(uri: Uri, useDedicated: boolean): Uri | PythonTerminalExecutionOptions {
     if (useDedicated) {
         const pr = getPythonProject(uri);
         if (pr) {
@@ -48,4 +48,24 @@ export function getRunInTerminalOptions(uri: Uri, useDedicated: boolean): Uri | 
         }
     }
     return uri;
+}
+
+export function getRunInTaskOptions(
+    name: string,
+    uri: Uri,
+    args: string[],
+    cwd: string,
+    env: { [key: string]: string | undefined },
+): PythonTaskExecutionOptions {
+    const pr = getPythonProject(uri);
+    if (pr) {
+        return {
+            project: pr,
+            args,
+            name,
+            cwd,
+            env,
+        };
+    }
+    throw new Error('Python project not found');
 }

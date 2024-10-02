@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 
-import { TestRun, TestRunProfileKind, Uri } from 'vscode';
+import { TaskExecution, TestRun, TestRunProfileKind, Uri, Disposable } from 'vscode';
 import * as path from 'path';
 import { ChildProcess } from 'child_process';
 import { IConfigurationService, ITestOutputChannel } from '../../../common/types';
@@ -25,6 +25,10 @@ import { PYTEST_PROVIDER } from '../../common/constants';
 import { EXTENSION_ROOT_DIR } from '../../../common/constants';
 import * as utils from '../common/utils';
 import { IEnvironmentVariablesProvider } from '../../../common/variables/types';
+import { getRunInTaskOptions, isEnvsExtensionInstalled } from '../../../envsExt/envsExtension';
+import { EnvsExtensionCommands } from '../../../envsExt/commands';
+import { executeCommand } from '../../../common/vscodeApis/commandApis';
+import { onDidEndTask, onDidStartTask } from '../../../common/vscodeApis/tasks.apis';
 
 export class PytestTestExecutionAdapter implements ITestExecutionAdapter {
     constructor(
@@ -180,15 +184,59 @@ export class PytestTestExecutionAdapter implements ITestExecutionAdapter {
                     serverDispose(); // this will resolve deferredTillServerClose
                     deferredTillEOT?.resolve();
                 });
-            } else {
+            } else if (isEnvsExtensionInstalled()) {
+                // combine path to run script with run args
+                const scriptPath = path.join(fullPluginPath, 'vscode_pytest', 'run_pytest_script.py');
+                const runArgs = [scriptPath, ...testArgs];
+                traceInfo(`Running pytest with arguments: ${runArgs.join(' ')} for workspace ${uri.fsPath} \r\n`);
+
                 // deferredTillExecClose is resolved when all stdout and stderr is read
-                const deferredTillExecClose: Deferred<void> = utils.createTestingDeferred();
+                try {
+                    const taskOptions = getRunInTaskOptions(
+                        'pytest',
+                        uri,
+                        runArgs,
+                        cwd,
+                        mutableEnv as { [x: string]: string | undefined },
+                    );
+                    const taskExecution: TaskExecution | undefined = await executeCommand(
+                        EnvsExtensionCommands.RUN_AS_TASK,
+                        taskOptions,
+                    );
+                    const disposables: Disposable[] = [];
+                    if (runInstance) {
+                        disposables.push(
+                            runInstance?.token.onCancellationRequested(() => {
+                                taskExecution?.terminate();
+                            }),
+                        );
+                    }
+                    disposables.push(
+                        onDidStartTask((e) => {
+                            if (e.execution === taskExecution) {
+                                disposables.forEach((d) => d.dispose());
+                            }
+                        }),
+                        onDidEndTask((e) => {
+                            if (e.execution === taskExecution) {
+                                serverDispose(); // this will resolve deferredTillServerClose
+                                deferredTillEOT?.resolve();
+                            }
+                        }),
+                    );
+                } catch {
+                    return Promise.reject();
+                }
+            } else {
                 // combine path to run script with run args
                 const scriptPath = path.join(fullPluginPath, 'vscode_pytest', 'run_pytest_script.py');
                 const runArgs = [scriptPath, ...testArgs];
                 traceInfo(`Running pytest with arguments: ${runArgs.join(' ')} for workspace ${uri.fsPath} \r\n`);
 
                 let resultProc: ChildProcess | undefined;
+
+                // deferredTillExecClose is resolved when all stdout and stderr is read
+                const deferredTillExecClose: Deferred<void> = utils.createTestingDeferred();
 
                 runInstance?.token.onCancellationRequested(() => {
                     traceInfo(`Test run cancelled, killing pytest subprocess for workspace ${uri.fsPath}`);
